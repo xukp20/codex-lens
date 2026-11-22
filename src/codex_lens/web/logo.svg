@@ -1,0 +1,49 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" width="128" height="128" fill="none">
+  <defs>
+    <linearGradient id="prismBg" x1="16" y1="12" x2="112" y2="116" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#1E2538"/>
+      <stop offset="55%" stop-color="#141826"/>
+      <stop offset="100%" stop-color="#0F131F"/>
+    </linearGradient>
+    <linearGradient id="prismEdge" x1="14" y1="14" x2="114" y2="114" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#7EA6FF" stop-opacity="0.72"/>
+      <stop offset="50%" stop-color="#6078A8" stop-opacity="0.28"/>
+      <stop offset="100%" stop-color="#34D399" stop-opacity="0.52"/>
+    </linearGradient>
+    <linearGradient id="lensRing" x1="30" y1="30" x2="98" y2="98" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#60A5FA"/>
+      <stop offset="55%" stop-color="#818CF8"/>
+      <stop offset="100%" stop-color="#34D399"/>
+    </linearGradient>
+    <linearGradient id="pulseStroke" x1="34" y1="64" x2="94" y2="64" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#60A5FA"/>
+      <stop offset="50%" stop-color="#A5B4FC"/>
+      <stop offset="100%" stop-color="#34D399"/>
+    </linearGradient>
+    <radialGradient id="apertureGlow" cx="64" cy="64" r="32" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#5B9CF6" stop-opacity="0.22"/>
+      <stop offset="70%" stop-color="#6366F1" stop-opacity="0.08"/>
+      <stop offset="100%" stop-color="#0F131F" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+
+  <!-- Sleek dark-indigo/slate glass prism frame (~10% margin) -->
+  <rect x="13" y="13" width="102" height="102" rx="24" fill="url(#prismBg)" stroke="url(#prismEdge)" stroke-width="2.5"/>
+  <rect x="18" y="18" width="92" height="92" rx="19" stroke="#FFFFFF" stroke-opacity="0.06" stroke-width="1"/>
+
+  <!-- Subtle optical inner glow -->
+  <circle cx="64" cy="64" r="32" fill="url(#apertureGlow)"/>
+
+  <!-- Precision optical lens rings -->
+  <circle cx="64" cy="64" r="32" stroke="url(#lensRing)" stroke-width="4.5"/>
+  <circle cx="64" cy="64" r="22.5" stroke="#93C5FD" stroke-opacity="0.28" stroke-width="1.5" stroke-dasharray="6 4"/>
+
+  <!-- Subtle telemetry pulse wave through the lens -->
+  <path d="M35 66H46L52.5 51L60 77L67.5 55L73.5 66H93" stroke="url(#pulseStroke)" stroke-width="3.25" stroke-linecap="round" stroke-linejoin="round"/>
+
+  <!-- 3 precision light nodes -->
+  <circle cx="91" cy="37" r="4.2" fill="#34D399"/>
+  <circle cx="91" cy="37" r="7.2" stroke="#34D399" stroke-opacity="0.28" stroke-width="1.2"/>
+  <circle cx="52.5" cy="51" r="2.8" fill="#93C5FD"/>
+  <circle cx="60" cy="77" r="2.8" fill="#A5B4FC"/>
+</svg>

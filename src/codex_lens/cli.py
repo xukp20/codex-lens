@@ -1,0 +1,72 @@
+"""Command-line entry points for Codex Lens."""
+import argparse
+import json
+import os
+from pathlib import Path
+import tempfile
+
+from . import __version__
+from .demo import demo_home
+from .serve import Lens, run
+
+
+def parser():
+    home = Path(os.environ.get("CODEX_HOME", str(Path.home() / ".codex")))
+    state = Path(os.environ.get("CODEX_LENS_STATE", str(Path.home() / ".local" / "state" / "codex-lens")))
+    ap = argparse.ArgumentParser(description=__doc__)
+    ap.add_argument("--version", action="version", version=__version__)
+    commands = ap.add_subparsers(dest="command", required=True)
+    for name in ("serve", "status", "doctor", "demo"):
+        sub = commands.add_parser(name)
+        sub.add_argument("--home", type=Path, default=home)
+        sub.add_argument("--state", type=Path, default=state)
+        sub.add_argument("--socket", type=Path)
+        if name in ("serve", "demo"):
+            sub.add_argument("--port", type=int, default=4318)
+        if name == "serve":
+            sub.add_argument("--no-collect", action="store_true")
+            sub.add_argument("--workspace-account-id", help="Explicit rollout workspace mapping for RPC snapshots")
+        if name == "status":
+            sub.add_argument("--json", action="store_true")
+            sub.add_argument("--provider", default="")
+            sub.add_argument("--range", default="7d")
+    return ap
+
+
+def main():
+    args = parser().parse_args()
+    os.umask(0o077)
+    socket = args.socket or args.home / "app-server-control/app-server-control.sock"
+    if args.command == "doctor":
+        print(json.dumps({
+            "version": __version__, "rollouts": (args.home / "sessions").is_dir(),
+            "quotaSocket": socket.exists(), "stateExists": args.state.exists(),
+            "platform": os.name, "mode": "local read-only source",
+        }, indent=2))
+    elif args.command == "demo":
+        with tempfile.TemporaryDirectory(prefix="codex-lens-demo-") as path:
+            root = Path(path)
+            run(demo_home(root), root / "unused.sock", root / "lens", args.port, collect=False)
+    elif args.command == "serve":
+        run(args.home, socket, args.state, args.port, collect=not args.no_collect and os.name != "nt",
+            known_account=args.workspace_account_id)
+    else:
+        lens = Lens(args.home, socket, args.state)
+        stats = lens.get_data("/api/analytics", {"range": args.range, "provider": args.provider})
+        quota = lens.get_data("/api/quota", {})
+        models = stats["modelCost"]
+        if args.json:
+            print(json.dumps({"version": __version__, "models": models["models"], "quota": quota,
+                              "totalTokens": models["totalTokens"], "costUsd": models["totalCostUsd"]}))
+        else:
+            print(f"{args.range}: {models['totalTokens']:,} tokens · {models['turns']:,} requests · "
+                  f"USD {models['totalCostUsd']:.2f} API-equivalent")
+            for window in quota["windows"]:
+                print(f"{window['name']} {window['windowDurationMins']}m: {window['usedPercent']}% used")
+
+
+if __name__ == "__main__":
+    try:
+        main()
+    except KeyboardInterrupt:
+        pass

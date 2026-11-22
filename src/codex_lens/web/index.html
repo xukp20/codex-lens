@@ -1,0 +1,152 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta http-equiv="Content-Security-Policy" content="frame-src 'none'; child-src 'none'">
+  <title>Codex Lens</title>
+  <script src="/preload.js"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" media="print" onload="this.media='all'" href="https://fonts.googleapis.com/css2?family=Google+Sans+Flex:ROND,opsz,slnt,wdth,wght@0..100,6..144,-10..0,92..100,100..1000&family=Google+Sans+Code:ital,wght@0,300..800;1,300..800&display=swap">
+  <link rel="stylesheet" href="/styles.css">
+</head>
+<body>
+  <!-- Initial Loading Skeleton -->
+  <div id="loading-shell" class="loading-shell" aria-live="polite" aria-busy="true">
+    <div class="skel-header">
+      <span class="skel skel-line" style="width: 44%; height: 14px"></span>
+      <span class="skel skel-line" style="width: 28%; height: 12px"></span>
+    </div>
+    <div class="skel-cards">
+      <div class="skel-card"><span class="skel skel-line" style="width: 38%"></span><span class="skel skel-line" style="width: 100%; height: 10px"></span><span class="skel skel-line" style="width: 64%"></span></div>
+      <div class="skel-card"><span class="skel skel-line" style="width: 46%"></span><span class="skel skel-line" style="width: 82%"></span></div>
+      <div class="skel-card"><span class="skel skel-line" style="width: 40%"></span><span class="skel skel-line" style="width: 90%; height: 10px"></span></div>
+    </div>
+  </div>
+
+  <div id="app" class="app hidden">
+    <header id="sticky-header" class="header">
+      <div class="header-row">
+        <div class="brand">
+          <img id="brand-logo-img" class="brand-logo" src="/logo.svg" width="18" height="18" alt="">
+          <svg id="brand-logo-fallback" class="brand-icon hidden" width="18" height="18" viewBox="0 0 16 16" aria-hidden="true">
+            <path d="M1.5 9.5h2.4l1.6-4.5 2.4 6.5 1.8-4 1.3 2h3.5" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+          <h1 id="app-title" class="app-title">Codex Lens</h1>
+        </div>
+        <div class="header-controls">
+          <span id="freshness" class="freshness" role="status" title="数据更新状态">
+            <span id="freshness-dot" class="freshness-dot" aria-hidden="true"></span>
+            <span id="freshness-text">准备中</span>
+          </span>
+          <label id="refresh-select-wrap" class="select sm" title="自动刷新间隔（面板不可见时自动暂停）">
+            <select id="refresh-select" aria-label="自动刷新间隔">
+              <option value="0">关</option>
+              <option value="15">15s</option>
+              <option value="30" selected>30s</option>
+              <option value="60">60s</option>
+              <option value="300">5m</option>
+            </select>
+          </label>
+          <button id="btn-refresh" type="button" class="icon-btn" title="立即刷新" aria-label="立即刷新">
+            <svg class="icon" width="15" height="15" viewBox="0 0 16 16" aria-hidden="true">
+              <path d="M13.5 8a5.5 5.5 0 1 1-1.4-3.65M13.5 2.5v2.75h-2.75"/>
+            </svg>
+          </button>
+          <button id="btn-settings" type="button" class="icon-btn" title="面板设置" aria-label="面板设置" aria-expanded="false" aria-controls="settings-drawer">
+            <svg class="icon" width="15" height="15" viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/>
+              <circle cx="12" cy="12" r="3"/>
+            </svg>
+          </button>
+        </div>
+      </div>
+
+      <div id="thread-picker" class="thread-picker">
+        <button id="thread-trigger" class="thread-trigger" type="button" aria-expanded="false" aria-controls="thread-popover">
+          <svg class="icon" width="14" height="14" viewBox="0 0 16 16" aria-hidden="true">
+            <path d="M3.5 3.5h9a1 1 0 0 1 1 1v5a1 1 0 0 1-1 1H7l-4.5 2v-8a1 1 0 0 1 1-1Z"/>
+          </svg>
+          <span id="thread-title" class="thread-title truncate">选择会话</span>
+          <span id="thread-provider" class="pill outline hidden"></span>
+          <svg class="icon chevron" width="14" height="14" viewBox="0 0 16 16" aria-hidden="true">
+            <path d="M4.5 6.5 8 10l3.5-3.5"/>
+          </svg>
+        </button>
+        <div id="thread-popover" class="obs-cell-popover thread-popover hidden">
+          <div class="thread-search-row">
+            <label class="thread-search">
+              <svg class="icon" width="14" height="14" viewBox="0 0 16 16" aria-hidden="true">
+                <circle cx="6.75" cy="6.75" r="3.75"/><path d="m9.5 9.5 3 3"/>
+              </svg>
+              <input id="thread-search" type="search" role="combobox" aria-autocomplete="list" aria-expanded="false" aria-controls="thread-options" aria-label="搜索近期会话" placeholder="搜索近期会话" autocomplete="off">
+            </label>
+            <button id="thread-clear" class="btn-link hidden" type="button">清除</button>
+          </div>
+          <div id="thread-options" class="thread-options" role="listbox" aria-label="近期会话"></div>
+          <div id="thread-empty" class="thread-empty muted-note hidden" role="status"></div>
+        </div>
+      </div>
+
+      <!-- Quick Range Bar (visible when any analytics module is active) -->
+      <div id="range-bar" class="range-bar hidden">
+        <div id="range-pills" class="range-pills" role="group" aria-label="全局时间范围">
+          <button type="button" class="range-pill" data-range="today">今日</button>
+          <button type="button" class="range-pill" data-range="5h">5h</button>
+          <button type="button" class="range-pill" data-range="7d">7d</button>
+          <button type="button" class="range-pill" data-range="30d">30d</button>
+          <button type="button" class="range-pill" data-range="90d">90d</button>
+          <button type="button" class="range-pill" data-range="custom">自定义</button>
+        </div>
+        <label id="provider-filter" class="select">
+          <select id="provider-select" class="source-pill" aria-label="历史统计 Provider">
+            <option value="openai">OpenAI</option>
+            <option value="krill-code">Krill</option>
+            <option value="">全部来源</option>
+          </select>
+        </label>
+      </div>
+
+      <div id="custom-range-row" class="custom-range-row hidden">
+        <input id="custom-from" type="date" aria-label="开始日期">
+        <span class="range-sep">→</span>
+        <input id="custom-to" type="date" aria-label="结束日期">
+        <button id="btn-apply-custom" type="button" class="btn-sm primary">应用</button>
+      </div>
+    </header>
+
+    <main id="main-content" class="main">
+      <div id="global-banner" class="banner error hidden" role="alert"></div>
+      <div id="modules-grid" class="modules-grid"></div>
+      <div id="empty-modules" class="empty-state hidden">
+        <p id="empty-title" class="empty-title">所有模块已关闭</p>
+        <p id="empty-desc" class="empty-desc">可在设置中开启实时上下文、缓存诊断、Token 流向、成本分析、热力图、缓存观测台或额度对齐模块。</p>
+        <button id="btn-open-settings-empty" type="button" class="btn-sm primary">打开设置</button>
+      </div>
+    </main>
+  </div>
+
+  <!-- Settings Drawer -->
+  <div id="settings-backdrop" class="drawer-backdrop hidden" aria-hidden="true"></div>
+  <aside id="settings-drawer" class="drawer hidden" role="dialog" aria-modal="true" aria-labelledby="settings-title" tabindex="-1">
+    <div class="drawer-header">
+      <h2 id="settings-title" class="drawer-title">面板设置</h2>
+      <button id="btn-close-settings" type="button" class="icon-btn" title="关闭设置" aria-label="关闭设置">
+        <svg class="icon" width="16" height="16" viewBox="0 0 16 16" aria-hidden="true">
+          <path d="M4 4l8 8M12 4l-8 8"/>
+        </svg>
+      </button>
+    </div>
+    <div id="settings-body" class="drawer-body"></div>
+  </aside>
+
+  <!-- Floating Tooltip for SVG Charts & Help Tips -->
+  <div id="chart-tooltip" class="chart-tooltip hidden" role="tooltip"></div>
+  <!-- Rich Cell Detail Popover for Cache Observatory Matrix -->
+  <div id="obs-cell-popover" class="obs-cell-popover hidden" role="dialog" aria-label="Matrix cell details"></div>
+
+  <script src="/analytics.js"></script>
+  <script src="/app.js"></script>
+</body>
+</html>

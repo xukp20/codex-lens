@@ -1,0 +1,11 @@
+{
+  "models": {
+    "gpt-6.2-astra": {"api": [8, 0.4, 40], "credits": [200, 10, 1000], "write": [10, 20], "fast": 2, "ultrafastPromo": true},
+    "gpt-6.2-sol": {"api": [2, 0.1, 10], "credits": [50, 2.5, 250], "write": [2.5, 5], "fast": 2, "ultrafastPromo": true},
+    "gpt-6-astra": {"api": [10, 1, 50], "credits": [250, 25, 1250], "write": [12.5, 25], "fast": 2, "ultrafast": 6},
+    "gpt-6.1-sol": {"api": [2, 0.1, 10], "credits": [50, 2.5, 250], "write": [2.5, 5], "fast": 2, "ultrafast": 6},
+    "gpt-6.1-terra": {"api": [1, 0.05, 5], "credits": [25, 1.25, 125], "write": [1.25, 2.5], "fast": 2},
+    "gpt-6-sol": {"api": [2, 0.2, 10], "credits": [50, 5, 250], "write": [2.5, 5], "fast": 2},
+    "gpt-6-luna": {"api": [0.1, 0.01, 0.5], "credits": [2.5, 0.25, 12.5], "write": [0.125, 0.25], "fast": 2}
+  }
+}
