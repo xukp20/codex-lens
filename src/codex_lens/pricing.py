@@ -41,7 +41,8 @@ class Pricing:
         unknown_tier = unknown_tier or multiplier is None
         uncached, cached, output = rate["api"]
         prompt = row["uncachedIn"] + row["cacheRead"]
-        long = prompt > rate.get("longContextThreshold", 272_000 if origin == "builtin" else float("inf"))
+        threshold = rate.get("longContextThreshold", 272_000 if origin == "builtin" else None)
+        long = isinstance(threshold, (int, float)) and prompt > threshold
         r_input, r_output = (2, 1.5) if long else (1, 1)
         writes = min(row["cacheCreate"], row["uncachedIn"])
         retention = row.get("cacheRetention")
@@ -72,5 +73,8 @@ def load_overrides(path):
         for entry in entries:
             if len(entry["api"]) != 3 or not all(type(x) in (int, float) and 0 <= x < float("inf") for x in entry["api"]):
                 raise ValueError("three finite token rates are required")
-            entry["effectiveFrom"] = datetime.fromisoformat(entry["effectiveFrom"]).replace(tzinfo=timezone.utc).timestamp() * 1000
+            start = datetime.fromisoformat(entry["effectiveFrom"])
+            if start.tzinfo is None:
+                start = start.replace(tzinfo=timezone.utc)
+            entry["effectiveFrom"] = start.timestamp() * 1000
     return Pricing(value)

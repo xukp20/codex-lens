@@ -2365,6 +2365,13 @@
       .slice(0, 3);
 
     let html = `
+      <div class="chart-caption-row">
+        <span>${fmtTokens(mc.totalTokens)} tok · ${num(mc.turns).toLocaleString()} req · ${num(mc.userTurns).toLocaleString()} turns</span>
+        ${mc.credits == null ? '' : `<span class="pill outline num">${num(mc.credits).toFixed(1)} Standard Credits</span>`}
+      </div>
+      ${mc.unknownTierTurns || mc.unverifiedWriteTurns ? `<div class="muted-note">
+        ${getLang() === 'en' ? 'Standard reference where tier is unknown or cache-write pricing is unverified.' : '档位未知或缓存写入费率未确认时，金额按 Standard 参考价展示。'}
+      </div>` : ''}
       <div class="cost-headline-row">
         <span class="cost-big num mono">${models.length && models.every(m => m.pricingSource === 'unpriced') ? '—' : fmtUsd(totalUsd)}</span>
         <div class="legend-inline">

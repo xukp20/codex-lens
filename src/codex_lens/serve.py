@@ -5,6 +5,8 @@ import json
 import threading
 import time
 import sqlite3
+from collections import defaultdict
+from datetime import datetime, timezone
 from functools import partial
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
@@ -13,7 +15,7 @@ from urllib.parse import parse_qs, urlsplit
 from . import __version__
 from .cache import DEFAULT_BREAKS, PERIODS, observatory
 from .pricing import CATALOG, CREDIT_RATES, Pricing, load_overrides
-from .quota import quota_cycles, unique
+from .quota import quota_cycles
 from .telemetry import Rollouts, account_ref, analytics, bounds, day_detail, range_rows, session_response
 
 WEB = Path(__file__).resolve().parent / "web"
@@ -44,15 +46,16 @@ async def read_quota(socket_path, known_account=None):
                     return reply["result"]
 
         async with asyncio.timeout(20):
-            await request(1, "initialize", {"clientInfo": {"name": "codex-lens", "version": "0.1.0"}})
+            await request(1, "initialize", {"clientInfo": {"name": "codex-lens", "version": __version__}})
             await rpc.send(json.dumps({"method": "initialized", "params": {}}))
             account = (await request(2, "account/read", {"refreshToken": False})).get("account") or {}
             if account.get("type") not in ("chatgpt", "chatgptAuthTokens"):
                 raise RuntimeError("ChatGPT sign-in is unavailable")
             result = await request(3, "account/rateLimits/read")
             try:
-                activity = await request(4, "account/usage/read")
-            except RuntimeError:
+                async with asyncio.timeout(4):
+                    activity = await request(4, "account/usage/read")
+            except (RuntimeError, TimeoutError):
                 activity = None
     buckets = result.get("rateLimitsByLimitId") or {"codex": result["rateLimits"]}
     windows = []
@@ -111,7 +114,7 @@ class Lens:
             names = {}
             path = self.home / "session_index.jsonl"
             if path.is_file():
-                with path.open() as stream:
+                with path.open(encoding="utf-8") as stream:
                     for line in stream:
                         try:
                             value = json.loads(line)
@@ -143,7 +146,7 @@ class Lens:
         with self.state_lock:
             now = int(time.time() * 1000)
             points = self.snapshots_db.execute(
-                "SELECT data FROM snapshots WHERE sampled>=?", (now - 120 * 86_400_000,),
+                "SELECT data FROM snapshots WHERE sampled>=? ORDER BY sampled", (now - 120 * 86_400_000,),
             ).fetchall()
             live = self.quota.copy()
         for (packed,) in points:
@@ -166,6 +169,20 @@ class Lens:
                                  and c["reset"] == (w.get("resetsAt") or 0) * 1000
                                  and c["account"] == (live.get("account") or "")[:12]), w.get("samples", 0))
         output = {k: v for k, v in live.items() if k != "account"}
+        if isinstance(live.get("activity"), dict):
+            linked = bool(self.known_account)
+            local_daily = defaultdict(int)
+            if linked:
+                for row in usage:
+                    if row["source"] == "openai" and row.get("account") == live.get("account"):
+                        day = datetime.fromtimestamp(row["completedAt"] / 1000, timezone.utc).date().isoformat()
+                        local_daily[day] += row["totalTokens"]
+            output["dailyComparison"] = [{
+                "date": item["startDate"], "accountTokens": item["tokens"],
+                "localTokens": local_daily[item["startDate"]] if linked else None,
+            } for item in (live["activity"].get("dailyUsageBuckets") or [])[-14:]
+                if isinstance(item.get("startDate"), str) and isinstance(item.get("tokens"), int)]
+
         return {**output, "cycles": [{k: v for k, v in c.items() if k != "segments"} for c in cycles[:24]]}
 
     def config_payload(self):
@@ -269,7 +286,8 @@ class Handler(BaseHTTPRequestHandler):
 
     def do_POST(self):
         origin = self.headers.get("Origin")
-        if not self.is_loopback_host() or (origin and origin != f"http://{self.headers['Host']}"):
+        cross_site = self.headers.get("Sec-Fetch-Site") not in (None, "same-origin", "none")
+        if cross_site or not self.is_loopback_host() or (origin and origin != f"http://{self.headers['Host']}"):
             return self.json_response(403, {"error": "Loopback preview only"})
         if self.path != "/api/config":
             return self.json_response(404, {"error": "Unknown route"})

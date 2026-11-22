@@ -138,9 +138,15 @@ window.LensAnalytics = (() => {
   function quota(data, lang) {
     const zh = lang !== 'en';
     const cycles = data.cycles || [];
-    const activity = data.activity?.dailyUsageBuckets;
-    const coverage = Array.isArray(activity) ? '<div class="muted-note">' +
-      (zh ? '账户日用量记录' : 'Account daily usage buckets') + ' · ' + activity.length + '</div>' : '';
+    const days = data.dailyComparison || [];
+    const num = x => x == null ? '—' : x.toLocaleString(lang);
+    const coverage = days.length ? '<details class="lens-cycle"><summary>' +
+      (zh ? '账户日用量与本机记录' : 'Account and locally attributed daily usage') +
+      '</summary><div class="lens-table-wrap"><table class="lens-table"><thead><tr><th>' +
+      (zh ? '日期 UTC' : 'Date UTC') + '</th><th>' + (zh ? '账户 tokens' : 'Account tokens') +
+      '</th><th>' + (zh ? '本机 tokens' : 'Local tokens') + '</th></tr></thead><tbody>' +
+      days.map(d => '<tr><th>' + escape(d.date) + '</th><td>' + num(d.accountTokens) +
+        '</td><td>' + num(d.localTokens) + '</td></tr>').join('') + '</tbody></table></div></details>' : '';
     return '<div class="card-expanded">' + coverage + cycles.slice(0, 8).map(c => {
       const points = c.anchors.map(a => ({v:a.used/100,n:10,label:date(a.time,lang)}));
       const title = c.id + ' · ' + c.minutes/60 + 'h · ' + date(c.reset,lang);
