@@ -4472,7 +4472,7 @@
 
   dom.modulesGrid.addEventListener('change', (event) => {
     const field = event.target.dataset.obsField;
-    if (!field) return;
+    if (!field || field === 'fit-choice') return;
     state.lensObs[field] = event.target.value;
     if (field === 'metric') renderGrid();
     else refreshAll(true);

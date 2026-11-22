@@ -134,7 +134,80 @@ window.LensAnalytics = (() => {
     return lines.join('\n');
   }
 
-  let extraQuota = () => '';
+  const fits = new Map();
+  function labKey(c) {
+    return new URLSearchParams({account:c.account,bucket:c.id,reset:c.reset}).toString();
+  }
+
+  function fitResult(data, selected, lang) {
+    const zh = lang !== 'en';
+    if (!data) return '';
+    if (data.error) return '<div class="banner error">' + escape(data.error) + '</div>';
+    const names = data.candidates.map(row => [row.name,row.name]);
+    const current = data.candidates.find(row => row.name === selected) || data.candidates[0];
+    const labels = {
+      candidate:zh ? '可比较' : 'Validated', exploratory:zh ? '仅探索' : 'Exploratory',
+      insufficient:zh ? '样本不足' : 'Too few samples'
+    };
+    const maximum = Math.max(1, ...(current.observed || []), ...(current.predicted || []));
+    const line = (items) => items?.map((v,i) => ({v:v/maximum,n:10,label:'#'+(i+1)+' · '+v.toFixed(2)+' pp'})) || [];
+    return '<div class="muted-note">' + (zh ? '推荐 ' : 'Preferred ') + escape(data.recommended) +
+      ' · n=' + data.samples + (zh ? ' · 排除 ' : ' · Excluded ') + data.excluded + '</div>' +
+      '<div class="lens-table-wrap"><table class="lens-table"><thead><tr><th>Model</th><th>Holdout MAE (pp)</th><th>Status</th></tr></thead><tbody>' +
+      data.candidates.map(row => '<tr><th>' + escape(row.name) + '</th><td>' +
+        (row.holdoutMae == null ? '—' : row.holdoutMae.toFixed(2)) + '</td><td>' +
+        labels[row.status] + '</td></tr>').join('') + '</tbody></table></div>' +
+      select('fit-choice', zh ? '拟合组合' : 'Fit subset', current.name, names) +
+      (current.params ? '<div class="lens-periods">' + Object.entries(current.params).map(([name,val]) =>
+        '<div class="metric-row"><span>' + escape(name) + '</span><span class="num mono">' +
+        val.value.toFixed(2) + ' [' + val.low.toFixed(2) + '–' + val.high.toFixed(2) + ']</span></div>').join('') +
+        '<div class="muted-note">' + (zh ? '观测与预测 · 近似 95% 区间' : 'Observed and predicted · approximate 95% intervals') + '</div>' +
+        chart([line(current.observed),line(current.predicted)], 'Observed / predicted') + '</div>' : '');
+  }
+
+  function extraQuota(cycle, lang) {
+    const key = labKey(cycle);
+    const state = fits.get(key);
+    const zh = lang !== 'en';
+    const label = zh ? '拟合实验室' : 'Calibration lab';
+    return '<div class="lens-lab" data-fit-key="' + escape(key) + '">' +
+      '<button type="button" class="btn-sm" data-fit-run>' + label + '</button>' +
+      '<div class="lens-fit-result">' + fitResult(state?.data, state?.selected, lang) + '</div></div>';
+  }
+
+  document.addEventListener('click', async (event) => {
+    const button = event.target.closest('[data-fit-run]');
+    if (!button) return;
+    const lab = button.closest('.lens-lab');
+    const key = lab.dataset.fitKey;
+    const result = lab.querySelector('.lens-fit-result');
+    const lang = document.documentElement.lang;
+    button.disabled = true;
+    result.textContent = lang === 'en' ? 'Fitting…' : '拟合中…';
+    let data;
+    try {
+      const reply = await fetch('/api/calibration?' + key);
+      if (!reply.ok) throw new Error(reply.status);
+      data = await reply.json();
+    } catch (err) {
+      data = {error:(lang === 'en' ? 'Fit unavailable: ' : '暂时无法拟合：') + err.message};
+    }
+    fits.set(key, {data,selected:data.recommended});
+    const current = [...document.querySelectorAll('.lens-lab')].find(item => item.dataset.fitKey === key);
+    if (current) {
+      current.querySelector('[data-fit-run]').disabled = false;
+      current.querySelector('.lens-fit-result').innerHTML = fitResult(data,data.recommended,lang);
+    }
+  });
+
+  document.addEventListener('change', (event) => {
+    if (event.target.dataset.obsField !== 'fit-choice') return;
+    const lab = event.target.closest('.lens-lab');
+    const state = fits.get(lab.dataset.fitKey);
+    state.selected = event.target.value;
+    lab.querySelector('.lens-fit-result').innerHTML = fitResult(state.data,state.selected,document.documentElement.lang);
+  });
+
   function quota(data, lang) {
     const zh = lang !== 'en';
     const cycles = data.cycles || [];
@@ -160,5 +233,5 @@ window.LensAnalytics = (() => {
     }).join('') + '</div>';
   }
 
-  return {cache,events,quota,report,setQuotaExtension:(renderer) => { extraQuota = renderer; }};
+  return {cache,events,quota,report};
 })();

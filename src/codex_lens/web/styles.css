@@ -1535,3 +1535,6 @@ button { cursor: pointer; }
   border-radius: var(--r-md); padding: 3px 5px; }
 .lens-cycle { border: 1px solid var(--border-c); border-radius: var(--r-md); padding: 6px 8px; }
 .lens-cycle summary { cursor: pointer; }
+
+.lens-lab { margin-top: 6px; }
+.lens-fit-result { display: grid; gap: 5px; padding-top: 5px; }

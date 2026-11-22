@@ -26,7 +26,7 @@ def unique(snapshots):
 
 
 def standard_value(row):
-    return Pricing().price({**row, "tier": "standard"})["costUsd"]
+    return Pricing().price({**row, "tier": "standard"})
 
 
 def quota_cycles(snapshots, usage, *, now):
@@ -60,19 +60,23 @@ def quota_cycles(snapshots, usage, *, now):
                 lo = bisect_right(stamps, first["sampledAt"])
                 hi = bisect_right(stamps, item["sampledAt"])
                 local = requests[lo:hi]
-                values = [standard_value(row) for row in local]
+                prices = [standard_value(row) for row in local]
+                values = [p["costUsd"] for p in prices]
                 covered = bool(local and all(value is not None for value in values))
                 by_model = defaultdict(float)
                 categories = defaultdict(lambda: [0, 0, 0])
-                for row, value in zip(local, values):
+                components = defaultdict(lambda: [0., 0., 0.])
+                for row, value, price in zip(local, values, prices):
                     if value is not None:
                         by_model[row["model"]] += value
+                        for i, amount in enumerate(price["componentsUsd"]):
+                            components[row["model"]][i] += amount
                     for i, field in enumerate(("uncachedIn", "cacheRead", "totalOut")):
                         categories[row["model"]][i] += row[field]
                 segments.append({
                     "from": first["sampledAt"], "to": item["sampledAt"], "delta": delta,
                     "usd": sum(v for v in values if v is not None), "covered": covered,
-                    "requests": len(local), "models": dict(by_model), "tokenMix": dict(categories),
+                    "requests": len(local), "models": dict(by_model), "tokenMix": dict(categories), "components": dict(components),
                 })
             first = item
         use = [segment for segment in segments if segment["covered"] and segment["usd"] > 0]

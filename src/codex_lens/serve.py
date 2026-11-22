@@ -14,6 +14,7 @@ from urllib.parse import parse_qs, urlsplit
 
 from . import __version__
 from .cache import DEFAULT_BREAKS, PERIODS, observatory
+from .calibration import calibrate
 from .pricing import CATALOG, CREDIT_RATES, Pricing, load_overrides
 from .quota import quota_cycles
 from .telemetry import Rollouts, account_ref, analytics, bounds, day_detail, range_rows, session_response
@@ -141,7 +142,7 @@ class Lens:
                     self.quota = {**self.quota, "stale": True}
             time.sleep(300)
 
-    def quota_data(self, rollouts, usage):
+    def quota_data(self, rollouts, usage, fit=None):
         events = [s for rollout in rollouts.values() for s in rollout.snapshots]
         with self.state_lock:
             now = int(time.time() * 1000)
@@ -156,6 +157,14 @@ class Lens:
         if not live.get("sampledAt") and points:
             live = {**json.loads(points[-1][0]), "stale": True}
         cycles = quota_cycles(events, usage, now=now)
+        if fit is not None:
+            for cycle in cycles:
+                if (fit.get("account"), fit.get("bucket"), fit.get("reset")) == (
+                    cycle["account"], cycle["id"], str(cycle["reset"])
+                ):
+                    return calibrate(cycle["segments"])
+            raise LookupError("quota window")
+
         if not live.get("windows"):
             recent = [cycle for cycle in cycles if cycle["active"]]
             live["windows"] = [{
@@ -211,11 +220,11 @@ class Lens:
             return {"ok": True, "version": __version__}
         if path == "/api/pricing":
             return {"models": [], "reference": CATALOG, "credits": CREDIT_RATES}
-        if path not in ("/api/sessions", "/api/session", "/api/analytics", "/api/day", "/api/quota", "/api/observatory"):
+        if path not in ("/api/sessions", "/api/session", "/api/analytics", "/api/day", "/api/quota", "/api/observatory", "/api/calibration"):
             raise LookupError(path)
         rollouts, names, rows = self.update_index()
-        if path == "/api/quota":
-            return self.quota_data(rollouts, rows)
+        if path in ("/api/quota", "/api/calibration"):
+            return self.quota_data(rollouts, rows, params if path == "/api/calibration" else None)
         if path == "/api/observatory":
             period = params.get("period", "1d")
             if period not in PERIODS:

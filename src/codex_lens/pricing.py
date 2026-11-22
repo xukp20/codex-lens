@@ -51,14 +51,18 @@ class Pricing:
         if writes and not unverified_write:
             write_rate = rate["write"][retention == "12h"]
             write_cost = writes * (write_rate - uncached) * r_input
-        api = (row["uncachedIn"] * uncached + row["cacheRead"] * cached) * r_input
-        api += row["totalOut"] * output * r_output + write_cost
+        components = (
+            (row["uncachedIn"] * uncached * r_input + write_cost) / 1e6,
+            row["cacheRead"] * cached * r_input / 1e6,
+            row["totalOut"] * output * r_output / 1e6,
+        )
         credit = None
         if origin == "builtin":
             ci, cc, co = rate["credits"]
             credit = (row["uncachedIn"] * ci + row["cacheRead"] * cc + row["totalOut"] * co) / 1e6
         return {
-            "costUsd": api * (multiplier or 1) / 1e6,
+            "costUsd": sum(components) * (multiplier or 1),
+            "componentsUsd": components,
             "cacheSavedUsd": (row["cacheRead"] * (uncached - cached) * r_input - write_cost) * (multiplier or 1) / 1e6,
             "credits": credit, "longContext": long, "pricingSource": origin,
             "unknownTier": unknown_tier, "unverifiedWrite": unverified_write,

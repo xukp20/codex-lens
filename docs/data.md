@@ -18,3 +18,9 @@ Each row is a per-million rate in USD for uncached input, cached input and outpu
 Quota windows are independent for each account, bucket, duration and reset. Positive differences are matched to local OpenAI requests from the same identifiable workspace. Repeated integer readings are coalesced. The base estimate reports the observed mix with a quantization interval. Account-wide activity can include work from other clients, so local attribution is partial whenever the dataset misses those clients. The live RPC's account label and rollout workspace stay separate until an explicit verified workspace match is available via `--workspace-account-id`.
 
 State is local and can be rebuilt from original rollouts. Back up the separate Lens state directory if you want to retain RPC samples or preferences.
+
+## Calibration lab
+
+The lab evaluates Base and M/C/O subsets for one observed cycle. Sol 6.2 is the reference model for M; C weights cache reads and O weights output. Inputs are built using the Standard API reference pricing of each request, including long-context tiers. A robust loss and mild penalty on relative weights stabilize the fit. Correlated features and small samples stay exploratory. Selection compares holdout errors in three contiguous time blocks. Displayed 95% intervals are approximate and describe the chosen model on the observed data, including an integer-quantization noise floor.
+
+The public credits rates and the allowance ratio remain separate. Results are a heuristic about the observed local workload and quota window.

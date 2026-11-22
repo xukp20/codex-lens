@@ -1,5 +1,10 @@
 # Changelog
 
+## v1.1.0
+
+- Add the quota Calibration Lab with Base and all M/C/O subsets.
+- Show chronological holdout error, relative factors, approximate intervals and observed versus predicted curves.
+
 ## v1.0.0
 
 - Publish the complete first release with per-day account and local usage views.
