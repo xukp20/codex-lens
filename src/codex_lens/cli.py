@@ -7,6 +7,7 @@ import tempfile
 
 from . import __version__
 from .demo import demo_home
+from .mcp import serve_mcp
 from .serve import Lens, run
 from .updater import managed
 
@@ -17,6 +18,8 @@ def parser():
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument("--version", action="version", version=__version__)
     commands = ap.add_subparsers(dest="command", required=True)
+    mcp = commands.add_parser("mcp", help="Read-only MCP app over stdio")
+    mcp.add_argument("--port", type=int, default=4318)
     for name in ("serve", "manage", "status", "doctor", "demo"):
         sub = commands.add_parser(name)
         sub.add_argument("--home", type=Path, default=home)
@@ -31,6 +34,8 @@ def parser():
         if name == "status":
             sub.add_argument("--json", action="store_true")
             sub.add_argument("--provider", default="")
+            sub.add_argument("--line", action="store_true", help="Compact line for terminal and tmux integration")
+            sub.add_argument("--thread", default="")
             sub.add_argument("--range", default="7d")
     return ap
 
@@ -38,6 +43,9 @@ def parser():
 def main():
     args = parser().parse_args()
     os.umask(0o077)
+    if args.command == "mcp":
+        serve_mcp(args.port)
+        return
     socket = args.socket or args.home / "app-server-control/app-server-control.sock"
     if args.command == "doctor":
         print(json.dumps({
@@ -63,7 +71,18 @@ def main():
         stats = lens.get_data("/api/analytics", {"range": args.range, "provider": args.provider})
         quota = lens.get_data("/api/quota", {})
         models = stats["modelCost"]
-        if args.json:
+        if args.line:
+            data = [f"Lens {models['totalTokens']:,} tok · {models['turns']:,} req"]
+            if args.thread:
+                session = lens.get_data("/api/session", {"conversationId": args.thread})
+                if session.get("found"):
+                    flow = session["liveContext"]
+                    hit = session["cacheDiagnostics"]["session"]["hitRatio"]
+                    data.insert(0, f"{flow['modelId']} cache {hit:.1%}")
+            data.extend(f"{w['windowDurationMins']//60}h {100-w['usedPercent']}% left"
+                        for w in quota["windows"] if w.get("windowDurationMins"))
+            print(" · ".join(data))
+        elif args.json:
             print(json.dumps({"version": __version__, "models": models["models"], "quota": quota,
                               "totalTokens": models["totalTokens"], "costUsd": models["totalCostUsd"]}))
         else:

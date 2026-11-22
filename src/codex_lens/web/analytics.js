@@ -186,7 +186,8 @@ window.LensAnalytics = (() => {
     result.textContent = lang === 'en' ? 'Fitting…' : '拟合中…';
     let data;
     try {
-      const reply = await fetch('/api/calibration?' + key);
+      const request = window.sidecar?.fetch || fetch;
+      const reply = await request('/api/calibration?' + key,{method:'GET'});
       if (!reply.ok) throw new Error(reply.status);
       data = await reply.json();
     } catch (err) {
@@ -233,5 +234,22 @@ window.LensAnalytics = (() => {
     }).join('') + '</div>';
   }
 
-  return {cache,events,quota,report};
+  function performance(data,lang) {
+    if (!data) return '';
+    const zh = lang !== 'en';
+    const sample = metrics => metrics.n ? metrics.p50.toFixed(0) + ' / ' + metrics.p90.toFixed(0) + ' · n=' + metrics.n : '—';
+    return '<div class="card-expanded"><div class="muted-note">' +
+      (zh ? '按用户轮统计（p50 / p90）。输出速率包含等待和工具时间。' :
+        'Per-turn p50 / p90. Output rate includes waiting and tool time.') + '</div>' +
+      '<div class="legend-inline"><span class="pill outline">' + (zh ? '主会话 ' : 'Primary ') +
+      data.attribution.primary.toLocaleString(lang) + '</span><span class="pill outline">' +
+      (zh ? '子代理 ' : 'Workers ') + data.attribution.worker.toLocaleString(lang) + '</span></div>' +
+      '<div class="lens-table-wrap"><table class="lens-table"><thead><tr><th>Model / effort</th><th>TTFT (ms)</th>' +
+      '<th>Turn (ms)</th><th>Output / s</th></tr></thead><tbody>' + data.models.map(row =>
+        '<tr><th>' + escape([row.model,row.effort,row.provider,row.worker?'worker':''].filter(Boolean).join(' · ')) +
+        '</th><td>' + sample(row.ttftMs) + '</td><td>' + sample(row.durationMs) +
+        '</td><td>' + sample(row.tokensPerTurnSecond) + '</td></tr>').join('') + '</tbody></table></div></div>';
+  }
+
+  return {cache,events,quota,report,performance};
 })();

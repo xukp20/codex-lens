@@ -27,3 +27,5 @@ Codex 的本地用量、缓存和订阅额度看板。界面沿用 AGY Lens 的�
 [数据与计价说明](docs/data.md) · [更新记录](CHANGELOG.md) · [English](README.md)
 
 [托管更新](docs/updates.md)
+
+[终端与 MCP 集成](docs/integration.md)

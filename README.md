@@ -36,3 +36,5 @@ The collector opens Codex rollout files for reading and sends read-only account 
 Public screenshots and tests use synthetic data. The UI builds on the [AGY Lens](https://github.com/xukp20/agy-lens) MIT-licensed components. The original notice is retained in [LICENSE](LICENSE).
 
 [Managed updates](docs/updates.md)
+
+[Terminal and MCP integration](docs/integration.md)

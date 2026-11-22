@@ -39,6 +39,7 @@ class Rollout:
         self.context = None
         self.rows = []
         self.snapshots = []
+        self.turn_stats = []
         self.epoch = 0
         self.turn = None
         self.started = None
@@ -74,10 +75,21 @@ class Rollout:
             self.meta["account"] = account_ref(payload.get("creator_account_id"))
             source = payload.get("source")
             self.meta["worker"] = isinstance(source, dict) and "subagent" in source
+            parent = source.get("subagent") if isinstance(source, dict) else None
+            spawn = parent.get("thread_spawn") if isinstance(parent, dict) else None
+            self.meta["parent"] = spawn.get("parent_thread_id") if isinstance(spawn, dict) else None
         if kind == "compacted" or (kind == "event_msg" and event in ("thread_rolled_back", "turn_aborted")):
             self.epoch += 1
         if kind == "event_msg" and event in ("task_complete", "turn_aborted"):
             self.ended = timestamp(packet["timestamp"])
+            if event == "task_complete" and isinstance(payload.get("turn_id"), str):
+                durations = {label: payload.get(field) for label, field in (
+                    ("duration", "duration_ms"), ("ttft", "time_to_first_token_ms")
+                )}
+                self.turn_stats.append({"turn": payload["turn_id"], "time": self.ended, **{
+                    label: value if isinstance(value, (int, float)) and value >= 0 else None
+                    for label, value in durations.items()
+                }})
         if kind == "event_msg" and event == "task_started":
             self.turn = payload.get("turn_id")
             self.started = timestamp(packet["timestamp"])
@@ -176,7 +188,7 @@ class Rollouts:
         return target
 
     def _save(self, key, target, offsets, reset):
-        state = {k: v for k, v in vars(target).items() if k not in ("rows", "snapshots")}
+        state = {k: v for k, v in vars(target).items() if k not in ("rows", "snapshots", "turn_stats")}
         with self.db:
             if reset:
                 self.db.execute("DELETE FROM files WHERE file_key=?", (key,))
@@ -208,7 +220,7 @@ class Rollouts:
                 if reset:
                     target = Rollout()
                 old_offset = target.offset
-                offsets = {"rows": len(target.rows), "snapshots": len(target.snapshots)}
+                offsets = {"rows": len(target.rows), "snapshots": len(target.snapshots), "turn_stats": len(target.turn_stats)}
                 if info.st_size > old_offset:
                     target.read(path)
                 if reset or target.offset != old_offset:

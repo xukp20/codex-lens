@@ -1,5 +1,10 @@
 # Changelog
 
+## v1.3.0
+
+- Add turn-level latency distributions and child-worker attribution.
+- Add a compact terminal status command and experimental MCP App connector with local marketplace metadata.
+
 ## v1.2.0
 
 - Add an opt-in release supervisor, verified staging, activation and rollback.

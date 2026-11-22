@@ -1445,6 +1445,7 @@
     lensObs: {view:'matrix',gap:'idle',active:'0',period:'1d',model:'',metric:'weighted',breaks:'',models:[]},
     lensObsData: null,
     lensObsError: null,
+    lensPerformance: null,
 
     ioScope: 'session', // 'session' | 'analytics'
     modelSort: 'cost', // 'cost' | 'turns' | 'tokens' | 'cache'
@@ -1766,6 +1767,18 @@
               state.analyticsError = e.message;
             })
         );
+      }
+
+      if (isCardExpandedForView('io-flow')) {
+        const options = new URLSearchParams({
+          provider: state.ioScope === 'analytics' ? dom.providerSelect.value : '',
+          thread: state.ioScope === 'session' ? resolveConversationId() : '',
+          range: state.rangeKey, from: state.customFrom, to: state.customTo
+        });
+        if (state.ioScope === 'analytics' || resolveConversationId()) {
+          tasks.push(getJson('/api/performance?' + options).then(data => {state.lensPerformance = data;})
+            .catch(() => {state.lensPerformance = null;}));
+        } else state.lensPerformance = null;
       }
 
       if (isModuleActiveForView('cache-observatory')) {
@@ -2333,7 +2346,7 @@
       `;
     }
 
-    return { badges: scopeToggle, body: html };
+    return { badges: scopeToggle, body: html + (expanded ? LensAnalytics.performance(state.lensPerformance,getLang()) : '') };
   }
 
   // =========================================================================
@@ -4371,7 +4384,8 @@
     const url = new URL(location.href);
     if (id) url.searchParams.set('conversationId', id);
     else url.searchParams.delete('conversationId');
-    history.replaceState(null, '', url);
+    if (window.sidecar?.setConversationId) window.sidecar.setConversationId(id);
+    else history.replaceState(null, '', url);
     state.session = null;
     state.sessionError = null;
     renderThreadTrigger();
@@ -4509,6 +4523,7 @@
         state.config.expanded[mod] = next;
         renderGrid();
         await saveConfigPatch({ expanded: { [mod]: next } });
+        if (mod === 'io-flow' && next) refreshAll(true);
         return;
       }
 

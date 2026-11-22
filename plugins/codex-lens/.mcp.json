@@ -1,0 +1,8 @@
+{
+  "mcpServers": {
+    "codex-lens": {
+      "command": "codex-lens",
+      "args": ["mcp", "--port", "4318"]
+    }
+  }
+}

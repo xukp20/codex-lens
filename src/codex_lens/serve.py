@@ -17,6 +17,7 @@ from urllib.parse import parse_qs, urlsplit
 from . import __version__
 from .cache import DEFAULT_BREAKS, PERIODS, observatory
 from .calibration import calibrate
+from .performance import performance
 from .pricing import CATALOG, CREDIT_RATES, Pricing, load_overrides
 from .quota import quota_cycles
 from .updater import CHECK_SECONDS, Updates
@@ -88,7 +89,7 @@ class Lens:
         self.last_http = time.monotonic()
         rates_path = state_dir / "prices.json"
         self.pricing = load_overrides(rates_path) if rates_path.is_file() else Pricing()
-        self.rollouts = Rollouts(home, state_dir / "telemetry.sqlite3", self.pricing)
+        self.rollouts = Rollouts(home, state_dir / "telemetry-v2.sqlite3", self.pricing)
         self.snapshots_db = sqlite3.connect(state_dir / "quota.sqlite3", check_same_thread=False)
         self.snapshots_db.execute("CREATE TABLE IF NOT EXISTS snapshots (sampled INTEGER PRIMARY KEY, data TEXT NOT NULL)")
         self.index_lock = threading.Lock()
@@ -247,11 +248,14 @@ class Lens:
             return {"ok": True, "version": __version__}
         if path == "/api/pricing":
             return {"models": [], "reference": CATALOG, "credits": CREDIT_RATES}
-        if path not in ("/api/sessions", "/api/session", "/api/analytics", "/api/day", "/api/quota", "/api/observatory", "/api/calibration"):
+        if path not in ("/api/sessions", "/api/session", "/api/analytics", "/api/day", "/api/quota", "/api/observatory", "/api/calibration", "/api/performance"):
             raise LookupError(path)
         rollouts, names, rows = self.update_index()
         if path in ("/api/quota", "/api/calibration"):
             return self.quota_data(rollouts, rows, params if path == "/api/calibration" else None)
+        if path == "/api/performance":
+            lo, hi = bounds(params.get("range"), params.get("from"), params.get("to"))
+            return performance(rollouts, lo, hi, params.get("provider", ""), params.get("thread", ""))
         if path == "/api/observatory":
             period = params.get("period", "1d")
             if period not in PERIODS:
