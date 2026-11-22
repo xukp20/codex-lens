@@ -2,6 +2,8 @@
 
 import asyncio
 import json
+import os
+import subprocess
 import threading
 import time
 import sqlite3
@@ -17,6 +19,7 @@ from .cache import DEFAULT_BREAKS, PERIODS, observatory
 from .calibration import calibrate
 from .pricing import CATALOG, CREDIT_RATES, Pricing, load_overrides
 from .quota import quota_cycles
+from .updater import CHECK_SECONDS, Updates
 from .telemetry import Rollouts, account_ref, analytics, bounds, day_detail, range_rows, session_response
 
 WEB = Path(__file__).resolve().parent / "web"
@@ -27,6 +30,7 @@ FILES = {
     "/app.js": ("app.js", "text/javascript"), "/logo.svg": ("logo.svg", "image/svg+xml"),
     "/preload.js": ("preload.js", "text/javascript"),
     "/analytics.js": ("analytics.js", "text/javascript"),
+    "/updates.js": ("updates.js", "text/javascript"),
 }
 
 
@@ -74,12 +78,14 @@ async def read_quota(socket_path, known_account=None):
 
 
 class Lens:
-    def __init__(self, home, socket, state_dir, known_account=None):
+    def __init__(self, home, socket, state_dir, known_account=None, *, managed=False, update_mode="notify"):
         self.home = home
         self.socket = socket
         self.state_dir = state_dir
         self.state_dir.mkdir(parents=True, mode=0o700, exist_ok=True)
         self.known_account = known_account
+        self.updates = Updates(state_dir, managed)
+        self.last_http = time.monotonic()
         rates_path = state_dir / "prices.json"
         self.pricing = load_overrides(rates_path) if rates_path.is_file() else Pricing()
         self.rollouts = Rollouts(home, state_dir / "telemetry.sqlite3", self.pricing)
@@ -93,7 +99,7 @@ class Lens:
         self.config = {
             "moduleOrder": CARDS, "modules": {card: True for card in CARDS},
             "expanded": {"live-context": True, "quota-budget": False},
-            "lang": "zh-CN", "defaultRange": "7d", "refreshSec": 30,
+            "lang": "zh-CN", "defaultRange": "7d", "refreshSec": 30, "updateMode": update_mode,
         }
         try:
             self.config.update(json.loads(self.config_path.read_text()))
@@ -194,11 +200,30 @@ class Lens:
 
         return {**output, "cycles": [{k: v for k, v in c.items() if k != "segments"} for c in cycles[:24]]}
 
+    def monitor_updates(self):
+        while True:
+            mode = self.config.get("updateMode")
+            if mode in ("notify", "auto"):
+                status = self.updates.status()
+                try:
+                    if time.time() - status.get("checkedAt", 0) >= CHECK_SECONDS:
+                        status = self.updates.check()
+                    if mode == "auto" and status.get("latest") and status.get("latest") != status.get("blocked"):
+                        if status.get("staged") != status["latest"]:
+                            status = self.updates.stage()
+                        if status.get("staged") and time.monotonic() - self.last_http >= 600:
+                            self.updates.request("apply")
+                except (OSError, RuntimeError, ValueError, subprocess.SubprocessError):
+                    pass
+            time.sleep(60)
+
     def config_payload(self):
         return {"version": __version__, "config": self.config, "indexStatus": {}}
 
     def patch_config(self, patch):
         with self.state_lock:
+            if patch.get("updateMode") in ("off", "notify", "auto"):
+                self.config["updateMode"] = patch["updateMode"]
             for key in ("lang", "refreshSec", "quotaDisplayMode", "defaultRange"):
                 if key in patch:
                     self.config[key] = patch[key]
@@ -216,6 +241,8 @@ class Lens:
     def get_data(self, path, params):
         if path == "/api/config":
             return self.config_payload()
+        if path == "/api/update/status":
+            return self.updates.status() | {"mode": self.config["updateMode"]}
         if path == "/api/health":
             return {"ok": True, "version": __version__}
         if path == "/api/pricing":
@@ -255,6 +282,7 @@ class Lens:
 class Handler(BaseHTTPRequestHandler):
     def __init__(self, lens, *args):
         self.lens = lens
+        self.lens.last_http = time.monotonic()
         super().__init__(*args)
 
     def log_message(self, *_):
@@ -298,6 +326,20 @@ class Handler(BaseHTTPRequestHandler):
         cross_site = self.headers.get("Sec-Fetch-Site") not in (None, "same-origin", "none")
         if cross_site or not self.is_loopback_host() or (origin and origin != f"http://{self.headers['Host']}"):
             return self.json_response(403, {"error": "Loopback preview only"})
+        operations = {
+            "/api/update/check": self.lens.updates.check,
+            "/api/update/stage": self.lens.updates.stage,
+            "/api/update/apply": lambda: self.lens.updates.request("apply"),
+            "/api/update/rollback": lambda: self.lens.updates.request("rollback"),
+        }
+        if self.path in operations:
+            if not self.lens.updates.enabled:
+                return self.json_response(409, {"error": "Start the managed Lens to update releases"})
+            try:
+                return self.json_response(200, operations[self.path]())
+            except (OSError, RuntimeError, ValueError, subprocess.SubprocessError) as error:
+                message = str(error) if isinstance(error, (ValueError, RuntimeError)) else "Release operation failed"
+                return self.json_response(409, {"error": message})
         if self.path != "/api/config":
             return self.json_response(404, {"error": "Unknown route"})
         try:
@@ -312,10 +354,13 @@ class Handler(BaseHTTPRequestHandler):
             self.json_response(400, {"error": "Invalid panel settings"})
 
 
-def run(home, socket_path, state, port, *, collect=True, known_account=None):
-    lens = Lens(home, socket_path, state, known_account)
+def run(home, socket_path, state, port, *, collect=True, known_account=None, update_mode="notify"):
+    managed = os.environ.get("CODEX_LENS_MANAGED_CHILD") == "1"
+    lens = Lens(home, socket_path, state, known_account, managed=managed, update_mode=update_mode)
     with ThreadingHTTPServer(("127.0.0.1", port), partial(Handler, lens)) as server:
         if collect:
             threading.Thread(target=lens.collect, daemon=True).start()
+        if managed:
+            threading.Thread(target=lens.monitor_updates, daemon=True).start()
         print(f"Codex Lens at http://127.0.0.1:{server.server_port}", flush=True)
         server.serve_forever()

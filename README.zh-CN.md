@@ -25,3 +25,5 @@ Codex 的本地用量、缓存和订阅额度看板。界面沿用 AGY Lens 的�
 默认监听回环地址。派生数据和设置保存在 `~/.local/state/codex-lens`，可用 `--state` 更改。产品截图和测试使用合成数据。
 
 [数据与计价说明](docs/data.md) · [更新记录](CHANGELOG.md) · [English](README.md)
+
+[托管更新](docs/updates.md)

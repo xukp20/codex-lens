@@ -34,3 +34,5 @@ Open the forwarded URL in the Codex browser and use its split view. The session 
 The collector opens Codex rollout files for reading and sends read-only account RPCs. Only derived metrics and local session metadata go into the Lens databases. The default state directory is `~/.local/state/codex-lens`, overridable with `CODEX_LENS_STATE` or `--state`. The demo uses a temporary directory. A Linux backend with Windows browser-over-SSH is the primary deployment; Windows local file indexing works without Unix-socket collection.
 
 Public screenshots and tests use synthetic data. The UI builds on the [AGY Lens](https://github.com/xukp20/agy-lens) MIT-licensed components. The original notice is retained in [LICENSE](LICENSE).
+
+[Managed updates](docs/updates.md)

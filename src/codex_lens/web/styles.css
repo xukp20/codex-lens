@@ -1538,3 +1538,7 @@ button { cursor: pointer; }
 
 .lens-lab { margin-top: 6px; }
 .lens-fit-result { display: grid; gap: 5px; padding-top: 5px; }
+
+.lens-update-popover { inset: 36px auto auto 12px; pointer-events: auto; gap: 8px; }
+#lens-update-pill.ready { color: var(--ok); background: var(--ok-bg); }
+.lens-release-notes { font: inherit; white-space: pre-wrap; max-height: 200px; overflow: auto; margin: 0; }

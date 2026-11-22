@@ -1,5 +1,10 @@
 # Changelog
 
+## v1.2.0
+
+- Add an opt-in release supervisor, verified staging, activation and rollback.
+- Add version badge, release notes and update policy in the dashboard.
+
 ## v1.1.0
 
 - Add the quota Calibration Lab with Base and all M/C/O subsets.

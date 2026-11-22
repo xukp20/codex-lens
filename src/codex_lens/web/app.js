@@ -4194,6 +4194,7 @@
       </section>
 
 
+      ${window.LensUpdates?.settings() || ''}
     `;
   }
 

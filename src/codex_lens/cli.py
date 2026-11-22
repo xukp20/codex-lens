@@ -8,6 +8,7 @@ import tempfile
 from . import __version__
 from .demo import demo_home
 from .serve import Lens, run
+from .updater import managed
 
 
 def parser():
@@ -16,14 +17,15 @@ def parser():
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument("--version", action="version", version=__version__)
     commands = ap.add_subparsers(dest="command", required=True)
-    for name in ("serve", "status", "doctor", "demo"):
+    for name in ("serve", "manage", "status", "doctor", "demo"):
         sub = commands.add_parser(name)
         sub.add_argument("--home", type=Path, default=home)
         sub.add_argument("--state", type=Path, default=state)
         sub.add_argument("--socket", type=Path)
-        if name in ("serve", "demo"):
+        if name in ("serve", "manage", "demo"):
             sub.add_argument("--port", type=int, default=4318)
-        if name == "serve":
+        if name in ("serve", "manage"):
+            sub.add_argument("--update-mode", choices=("off", "notify", "auto"), default="notify")
             sub.add_argument("--no-collect", action="store_true")
             sub.add_argument("--workspace-account-id", help="Explicit rollout workspace mapping for RPC snapshots")
         if name == "status":
@@ -47,9 +49,15 @@ def main():
         with tempfile.TemporaryDirectory(prefix="codex-lens-demo-") as path:
             root = Path(path)
             run(demo_home(root), root / "unused.sock", root / "lens", args.port, collect=False)
-    elif args.command == "serve":
-        run(args.home, socket, args.state, args.port, collect=not args.no_collect and os.name != "nt",
-            known_account=args.workspace_account_id)
+    elif args.command in ("serve", "manage"):
+        kwargs = {
+            "collect": not args.no_collect and os.name != "nt",
+            "known_account": args.workspace_account_id or os.environ.get("CODEX_LENS_WORKSPACE_ACCOUNT_ID"),
+        }
+        if args.command == "manage":
+            managed(args.home.resolve(), socket.absolute(), args.state.resolve(), args.port, mode=args.update_mode, **kwargs)
+        else:
+            run(args.home, socket, args.state, args.port, update_mode=args.update_mode, **kwargs)
     else:
         lens = Lens(args.home, socket, args.state)
         stats = lens.get_data("/api/analytics", {"range": args.range, "provider": args.provider})
